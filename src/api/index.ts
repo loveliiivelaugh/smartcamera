@@ -27,7 +27,10 @@ const client = axios.create({
     headers: {
         "Content-Type": "application/json",
     },
-    auth: JSON.parse(import.meta.env.VITE_BASIC_AUTH),
+    auth: {
+        username: import.meta.env.VITE_BASIC_AUTH_USERNAME,
+        password: import.meta.env.VITE_BASIC_AUTH_PASSWORD
+    },
 });
 
 // Queries
