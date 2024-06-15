@@ -43,6 +43,8 @@ const Camera = () => {
 
     const [availableDevices, setAvailableDevices] = useState([] as any);
 
+    // const mediaStream = new MediaStream();
+
 
     const capture = useCallback(async () => {
         const imageSrc = webcamRef.current.getScreenshot();
@@ -64,7 +66,7 @@ const Camera = () => {
             // draw the video first
             canvasContext.drawImage(videoRef.current, 0, 0, 640, 480);
 
-            // console.log(ssdModel, canvasContext)
+            // console.log(ssdModel)
             
             const imageSrc = webcamRef.current.getScreenshot();
             const image = new Image();
@@ -106,10 +108,10 @@ const Camera = () => {
         }
     };
 
-    const startDetecting = () => {
+    const startDetecting = async () => {
         const detectInterval = setInterval(detectFaces, 20)
         setDetectInterval(detectInterval)
-    }
+    };
 
     const loadModels = async () => {
         const ssd = await cocoSsd.load();
@@ -117,11 +119,11 @@ const Camera = () => {
 
         const devices = await navigator.mediaDevices.enumerateDevices();
         setAvailableDevices(devices);
-        console.log(
-            "webcamProps: ", 
-            await navigator.mediaDevices,
-            devices
-        )
+        // console.log(
+        //     "webcamProps: ", 
+        //     await navigator.mediaDevices,
+        //     devices
+        // )
 
         return { blazefaceModel, ssd };
     };
@@ -140,6 +142,10 @@ const Camera = () => {
         // // If the camera is reopened from the image view, ...
         // // ... reset the image classification
         // actions.handleImageClassification(null);
+        // const videoElement = videoRef.current;
+        // videoElement.srcObject = mediaStream;
+        // videoElement.play();
+        // console.log('videoEL: ', videoElement);
         
         loadModels()
             .then(({ ssd, blazefaceModel }) => {

@@ -18,7 +18,9 @@ const queryPaths = {
     "getCrossPlatformState": '/api/cross-platform',
     "theme": "/api/theme/themeConfig",
     "content": "/api/cms/content",
-    "appDepotUrl": import.meta.env.VITE_HOME_APP
+    "appDepotUrl": (import.meta.env.MODE === "development") 
+        ? "http://localhost:3000"
+        : import.meta.env.VITE_DEVELOPMENT_APP
 };
 
 // Client Config + Init
