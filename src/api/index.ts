@@ -20,7 +20,7 @@ const queryPaths = {
     "content": "/api/cms/content",
     "appDepotUrl": (import.meta.env.MODE === "development") 
         ? "http://localhost:3000"
-        : import.meta.env.VITE_DEVELOPMENT_APP
+        : import.meta.env.VITE_HOME_APP
 };
 
 // Client Config + Init
