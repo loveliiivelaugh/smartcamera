@@ -3,45 +3,27 @@ import { StrictMode, Suspense } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import { SupabaseAuthProvider } from './Auth/Auth';
-
 // Utilities
+import { SupabaseAuthProvider } from './Auth/Auth';
+// import { KeycloakProvider } from './Keycloak/KeycloakProvider';  
 import { PageTransitionWrapper, ThemeProvider } from './theme/ThemeProvider';
-import { client, queryPaths } from './api';
+import { client, queries } from './api';
 
 // App + styles
 import App from './App.tsx'
 import './index.css'
 
-// import { KeycloakProvider } from './Keycloak/KeycloakProvider';  
-
 
 const queryClient = new QueryClient();
 
 // On Apps First Load
-const InitConfigProvider = ({ children, session }: { children: any, session: any }) => {
-    // Get Theme Config
-    const themeConfigQuery = useQuery(({
-        queryKey: ["themeConfig"],
-        queryFn: async () => (await client.get(queryPaths.theme)).data,
-    }));
-    // Get content from CMS
-    const contentQuery = useQuery(({
-        queryKey: ["content"],
-        queryFn: async () => (await client.get(queryPaths.content)).data,
-        select: (data) => {
-            (window as any).appContent = data ? data : {};
+const InitConfigProvider = (props: any) => {
+    const { children, session } = props;
+    const initConfigQuery = useQuery((queries.initConfigQuery));
 
-            return data;
-        }
-    }));
-
-    console.log({ contentQuery });
-    (client as any).defaults.headers.common["auth-token"] = `userAuthToken=${session?.access_token}&appId=${import.meta.env.VITE_APP_ID}`;
-
-
-    // Set global access to server client
-    (window as any).client = client;
+    // Set authentication headers
+    const authParams = `userAuthToken=${session?.access_token}&appId=${import.meta.env.VITE_APP_ID}`;
+    (client as any).defaults.headers.common["auth-token"] = authParams;
 
     // Initialize Keycloak
     // const [keycloakInstance, setKeycloakInstance] = useState(null as any);
@@ -50,12 +32,14 @@ const InitConfigProvider = ({ children, session }: { children: any, session: any
     //     setKeycloakInstance(instance);
     // }, []);
 
+    // return;
+    console.log("initConfigQuery: ", initConfigQuery);
     return ({
         pending: "Uninitialized...",
         loading: "Loading App Theme Configuration...",
-        success: children(themeConfigQuery.data),
+        success: children((initConfigQuery as any)?.data?.themeConfig),
         error: "Something went wrong..."
-    }[themeConfigQuery.status]);
+    }[initConfigQuery.status]);
 };
 
 

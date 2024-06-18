@@ -9,6 +9,7 @@ interface CameraStore {
     handleImageSrc: (imageSrc: string) => void
     handleImageClassification: (imageClassification: any) => void
     toggleVisionMode: (visionMode: "default" | "documents") => void
+    setState: (state: CameraStore) => void,
 }
 
 
@@ -21,6 +22,9 @@ const useCameraStore = create<CameraStore>((set) => ({
     handleImageSrc: (imageSrc: string) => set(() => ({ imageSrc })), // String Base64 image
     handleImageClassification: (imageClassification: any) => set(() => ({ imageClassification })), // Object {}
     toggleVisionMode: (visionMode: "default" | "documents") => set(() => ({ visionMode })), // String ["Default", "Documents", "Receipts"]
+
+    // master key function
+    setState: (state: CameraStore) => set((prevState: CameraStore) => ({ ...prevState, ...state })),
 }));
 
 

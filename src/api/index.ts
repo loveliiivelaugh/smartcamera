@@ -18,14 +18,18 @@ const queryPaths = {
     "getCrossPlatformState": '/api/cross-platform',
     "theme": "/api/theme/themeConfig",
     "content": "/api/cms/content",
-    "appDepotUrl": (import.meta.env.MODE === "development") 
+    "appConfig": "/api/appConfig",
+    "appDepotUrl": (import.meta.env.MODE === "development")
         ? "http://localhost:3000"
-        : import.meta.env.VITE_HOME_APP
+        : import.meta.env.VITE_HOME_APP,
+    "hostname": (import.meta.env.MODE === "development")
+        ? "http://localhost:5001"
+        : import.meta.env.VITE_HOSTNAME
 };
 
 // Client Config + Init
 const client = axios.create({
-    baseURL: import.meta.env.VITE_HOSTNAME,
+    baseURL: queryPaths.hostname,
     headers: {
         "Content-Type": "application/json",
     },
@@ -35,6 +39,7 @@ const client = axios.create({
     },
 });
 
+let crossPlatformData: any // temp state 
 // Queries
 const queries = {
     getCrossPlatformState: () => ({
@@ -44,7 +49,39 @@ const queries = {
             (window as any).crossPlatformState = data;
             return data;
         },
-    })
+    }),
+
+    getContent: () => ({
+        queryKey: ['content'],
+        queryFn: async () => (await client.get(queryPaths.content)).data
+    }),
+
+    initConfigQuery: ({
+        queryKey: ['appConfig'],
+        queryFn: async () => (await client.get(queryPaths.appConfig)).data,
+        select: (data: any) => {
+            const { cms, themeConfig, crossPlatformStateTable } = data;
+
+            // Check URL Params
+            const { search, pathname } = window.location;
+
+            const [key, crossPlatformStateId] = search 
+                ? search.split('?')[1].split('=') 
+                : [null, null];
+
+            const isCrossPlatform = pathname.includes('cross_platform');
+
+            crossPlatformData = crossPlatformStateId
+                ? crossPlatformStateTable
+                    .find((session: any) => (session.id == crossPlatformStateId))
+                : null;
+
+            (window as any).appContent = cms ? cms : null;
+            (window as any).crossPlatformState = crossPlatformData ? crossPlatformData : null;
+
+            return { cms, themeConfig, crossPlatformData, isCrossPlatform };
+        }
+    }),
 };
 
 export {

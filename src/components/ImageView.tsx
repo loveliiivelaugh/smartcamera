@@ -1,6 +1,7 @@
 // Packages
+import { useRef } from 'react';
 import { LazyLoadImage } from 'react-lazy-load-image-component';
-import { Box, Typography, List, ListItemText, IconButton, Skeleton } from '@mui/material';
+import { Box, Typography, List, ListItemText, IconButton, Skeleton, TextField } from '@mui/material';
 import { BottomNavigation, BottomNavigationAction } from "@mui/material";
 import { styled } from '@mui/material/styles';
 import { Settings as SettingsIcon, Camera as CameraIcon } from '@mui/icons-material';
@@ -9,7 +10,9 @@ import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 
 import { useCameraStore } from '../store';
-import { client, queryPaths } from '../api';
+import { client, queries, queryPaths } from '../api';
+import { useQuery } from '@tanstack/react-query';
+import { useSupabaseStore } from '../Auth/Auth';
 
 
 const ImageViewContainer = styled(Box)(() => ({
@@ -21,9 +24,14 @@ const ImageViewContainer = styled(Box)(() => ({
 
 const ImageView = () => {
     const cameraStore = useCameraStore();
+    const supabaseStore = useSupabaseStore();
+    const contentQuery = useQuery(queries.getContent());
+
+    const textfieldRef = useRef(null);
 
     const handleSendImage = async () => {
 
+        // Make a copy of the current cameraStore state
         // Remove all functions from cameraStore
         const cameraStoreData = Object.assign(
             {}, 
@@ -33,33 +41,57 @@ const ImageView = () => {
                 .filter(Boolean)
         );
 
+        function getApp(appName: string) {
+            return (contentQuery as any).data.apps
+                .find(({ name }: { name: string }) => (name === appName));
+        };
+
+        // get the current app metadata
+        const thisApp = getApp("camera");
+        // get the next app metadata
+        const nextApp = getApp("AI");
+
+        // get the next app url
+        const link = (import.meta.env.MODE === "development")
+            ? nextApp.dev_url
+            : nextApp.url;
+
+        console.log({ thisApp, nextApp })
+
+        // Format the cross platform state
         const payload = {
-            appId: "smartcamera",
-            source: "5175",
+            appId: thisApp?.name,
+            source: thisApp?.dev_url,
+            destination_url: link,
+            destination_app: nextApp?.name,
             data: {
-                cameraStoreData,
+                cameraStoreData: { 
+                    ...cameraStoreData, 
+                    message: (textfieldRef as any)?.current?.value
+                },
                 crossPlatformState: (window as any).crossPlatformState
-            }
+            },
+            user_id: (supabaseStore.session.user?.id || null)
         };
 
         console.log("handleSendImage: ", {
             currentAppStores: {cameraStoreData}, 
             incomingPlatformState: (window as any)?.crossPlatformState, 
-            outgoingPlatformState: payload
+            outgoingPlatformState: payload,
+            payload
         });
 
-        const response = await client.post(
+        // Send the cross platform state to the db
+        const response = (await client.post(
             queryPaths.getCrossPlatformState, 
             payload
-        );
+        ));
+
+        console.log("handleSendImage response: ", response);
         
         if (response.status === 200) {
-            // let baseUrl = `http://localhost:${window.crossPlatformState.source}`;
-            let baseUrl = "";
-            let queryParams = `?appId=${payload.appId}&source=${payload.source}&session_id=${response.data.session_id}`;
-            let nextUrl = (baseUrl + queryParams);
-            nextUrl = "http://localhost:3002";
-            window.location.href = nextUrl;
+            let queryString = `${link}/cross_platform?id=${response.data[0].id}`;
+            window.location.href = queryString;
         };
     }
 
@@ -114,6 +146,18 @@ const ImageView = () => {
                         )) : (
                             <Skeleton variant="rectangular" width="100%" height={40} />
                         )}
+
+                {((window as any)?.crossPlatformState?.appId === "AI") 
+                    && (
+                        <TextField
+                            inputRef={textfieldRef}
+                            id="outlined-multiline-static"
+                            label="Message"
+                            placeholder="Test Message"
+                            fullWidth
+                        />
+                    )
+                }
             </List>
             <BottomNavigation
                 showLabels
