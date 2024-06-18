@@ -65,7 +65,7 @@ const queries = {
             // Check URL Params
             const { search, pathname } = window.location;
 
-            const [key, crossPlatformStateId] = search 
+            const [, crossPlatformStateId] = search 
                 ? search.split('?')[1].split('=') 
                 : [null, null];
 
