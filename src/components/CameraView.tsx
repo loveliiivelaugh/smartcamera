@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Webcam from "react-webcam"
-import { Box, IconButton } from "@mui/material"
+import { Alert, Box, IconButton } from "@mui/material"
 import { BottomNavigation, BottomNavigationAction } from "@mui/material";
 import { styled } from "@mui/material/styles"
 import CameraIcon from "@mui/icons-material/Camera"
 import SettingsIcon from "@mui/icons-material/Settings"
 import VideoCallIcon from "@mui/icons-material/VideoCall"
+import DownloadIcon from "@mui/icons-material/Download";
 import { motion } from "framer-motion"
 
 import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import * as blazeface from '@tensorflow-models/blazeface';
 
-import { useCameraStore } from "../store";
-
+import { useCameraStore, useModelStore } from "../store";
+import { client } from "../api";
 
 
 const WebcamContainer = styled(Box)(() => ({
@@ -31,19 +32,82 @@ const defaultVideoConstraints = {
 
 const Camera = () => {
     const cameraStore = useCameraStore();
+    const modelStore = useModelStore();
     const [videoConstraints, setVideoConstraints] = useState(defaultVideoConstraints);
-    
+
     const webcamRef = useRef(null as any);
     const canvasRef = useRef(null as any);
     const videoRef = useRef(null as any);
 
-    const [ssdModel, setSsdModel] = useState(null as any);
-    const [blazefaceModel, setBlazefaceModel] = useState(null as any);
+    // const [ssdModel, setSsdModel] = useState(null as any);
+    // const [blazefaceModel, setBlazefaceModel] = useState(null as any);
     const [detectInterval, setDetectInterval] = useState(null as any);
 
     const [availableDevices, setAvailableDevices] = useState([] as any);
+    const [problems, setProblems] = useState([] as any);
 
-    // const mediaStream = new MediaStream();
+    const mediaRecorderRef = useRef(null);
+    const [capturing, setCapturing] = useState(false);
+    const [recordedChunks, setRecordedChunks] = useState([]);
+
+    // console.log("recorderChunks", recordedChunks)
+
+    const handleStartCaptureClick = useCallback(() => {
+        setCapturing(true);
+        (mediaRecorderRef as any).current = new MediaRecorder(webcamRef.current.stream, {
+            mimeType: "video/webm"
+        });
+        (mediaRecorderRef as any).current.addEventListener(
+            "dataavailable",
+            handleDataAvailable
+        );
+        (mediaRecorderRef as any).current.start();
+    }, [webcamRef, setCapturing, mediaRecorderRef]);
+
+    const handleDataAvailable = useCallback(
+        async ({ data }: any) => {
+            if (data.size > 0) {
+                setRecordedChunks((prev) => prev.concat(data));
+
+                let type = "video/webm";
+                const blob = new Blob(recordedChunks, { type });
+
+                (window as any).extras.ws.send(blob);
+
+                const response = await client.post(
+                    '/api/camera/upload', 
+                    blob, 
+                    { headers: { 'Content-Type': type } }
+                );
+
+                console.log("response", response);
+
+            }
+        },
+        [setRecordedChunks]
+    );
+
+    const handleStopCaptureClick = useCallback(() => {
+        (mediaRecorderRef as any).current.stop();
+        setCapturing(false);
+    }, [mediaRecorderRef, webcamRef, setCapturing]);
+
+    const handleDownload = useCallback(() => {
+        if (recordedChunks.length) {
+            const blob = new Blob(recordedChunks, {
+                type: "video/webm"
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            document.body.appendChild(a);
+            // a.style = "display: none";
+            a.href = url;
+            a.download = "react-webcam-stream-capture.webm";
+            a.click();
+            window.URL.revokeObjectURL(url);
+            setRecordedChunks([]);
+        }
+    }, [recordedChunks]);
 
 
     const capture = useCallback(async () => {
@@ -66,17 +130,20 @@ const Camera = () => {
             // draw the video first
             canvasContext.drawImage(videoRef.current, 0, 0, 640, 480);
 
-            // console.log(ssdModel)
-            
+            // console.log(modelStore);
+
             const imageSrc = webcamRef.current.getScreenshot();
             const image = new Image();
+            image.height = webcamRef.current.props.height;
+            image.width = webcamRef.current.props.width;
             image.src = imageSrc;
 
             // Facial Recognition
-            if (ssdModel) {
+            if (modelStore.ssd) {
+                const ssdModel = modelStore.ssd;
                 const objectDetected = await ssdModel.detect(image);
-                const facialRecognition = await blazefaceModel.estimateFaces(image);
-        
+                // const facialRecognition = await blazefaceModel.estimateFaces(image);
+
                 // const isMichaelsFace = compareLandmarks(michaelsFacialLandmarks, facialRecognition[0]);
                 // if (isMichaelsFace) {
                 //     canvasContext = {}
@@ -85,7 +152,7 @@ const Camera = () => {
                 //     actions.setIsAuthenticated(true)
                 //     // navigate('/')
                 // }
-                console.log({objectDetected, facialRecognition });
+                console.log({ objectDetected });
 
                 objectDetected.forEach((detection: any) => {
                     const x = detection.bbox[0];
@@ -93,19 +160,22 @@ const Camera = () => {
                     const width = detection.bbox[2];
                     const height = detection.bbox[3];
                     canvasContext.strokeStyle = 'red';
-                    
-                    if (detection.score.toFixed(2) > 0.8) 
+
+                    if (detection.score.toFixed(2) > 0.8)
                         canvasContext.strokeRect(x, y, width, height);
-                
+
                     canvasContext.font = '16px Arial';
                     canvasContext.fillStyle = 'white';
-                    
-                    if (detection.score.toFixed(2) > 0.8) 
+
+                    if (detection.score.toFixed(2) > 0.8)
                         canvasContext.fillText(`${detection.class} ${detection.score.toFixed(2)}`, x, y);
                 })
-            }
-
-        }
+            } else {
+                let problem = "No Coco SSD model found (Object Detection)";
+                if (problems.includes(problem)) return;
+                else setProblems((problems: any) => [...problems, problem]);
+            };
+        };
     };
 
     const startDetecting = async () => {
@@ -116,27 +186,38 @@ const Camera = () => {
     const loadModels = async () => {
         const ssd = await cocoSsd.load();
         const blazefaceModel = await blazeface.load();
+        // console.log(
+        //     "webcamProps: ",
+        //     // await navigator.mediaDevices,
+        //     // devices,
+        //     ssd, blazefaceModel
+        // );
+
+        modelStore.setSsd(ssd);
+        modelStore.setBlazeface(blazefaceModel);
 
         const devices = await navigator.mediaDevices.enumerateDevices();
         setAvailableDevices(devices);
-        // console.log(
-        //     "webcamProps: ", 
-        //     await navigator.mediaDevices,
-        //     devices
-        // )
 
-        return { blazefaceModel, ssd };
+        // startDetecting();
+        return true;
     };
 
     const handleDoubleClick = (event: any) => {
         console.log("Camera handleDoubleClick: ", event)
-        setVideoConstraints(prev => ({ 
-            ...prev, 
-            facingMode: prev.facingMode === "user" 
-                ? "environment" 
+        setVideoConstraints(prev => ({
+            ...prev,
+            facingMode: prev.facingMode === "user"
+                ? "environment"
                 : "user"
         }))
     };
+
+    useEffect(() => {
+        if (
+            modelStore.ssd && modelStore.blazeface
+        ) startDetecting();
+    }, [modelStore.ssd, modelStore.blazeface]);
 
     useEffect(() => {
         // // If the camera is reopened from the image view, ...
@@ -146,16 +227,11 @@ const Camera = () => {
         // videoElement.srcObject = mediaStream;
         // videoElement.play();
         // console.log('videoEL: ', videoElement);
-        
-        loadModels()
-            .then(({ ssd, blazefaceModel }) => {
-                console.log("after model is loaded: ", ssd, blazefaceModel)
-                setSsdModel(ssd);
-                setBlazefaceModel(blazefaceModel);
 
-                startDetecting();
-            })
-            .catch((error) => console.error("Error loading SSD model: ", error))
+        (async () => {
+            const models = await loadModels();
+            console.log({ models });
+        })();
 
         return () => {
             clearInterval(detectInterval);
@@ -165,18 +241,33 @@ const Camera = () => {
 
     const items = {
         "Settings": (
-            <IconButton onClick={() => {}}>
+            <IconButton onClick={() => { }}>
                 <SettingsIcon />
             </IconButton>
         ),
         "Camera": (
-            <IconButton onClick={capture} sx={{ '&:hover': { background: 'rgba(0,0,0,0.2)', cursor: 'pointer' }}}>
+            <IconButton onClick={capture} sx={{ '&:hover': { background: 'rgba(0,0,0,0.2)', cursor: 'pointer' } }}>
                 <CameraIcon />
             </IconButton>
         ),
-        "Record": (
-            <IconButton onClick={() => {}}>
+        [`${capturing ? "Stop" : "Record"}`]: (
+            <IconButton 
+                onClick={() => capturing 
+                    ? handleStopCaptureClick() 
+                    : handleStartCaptureClick()
+                } 
+                sx={{ '&:hover': { 
+                    background: 'rgba(0,0,0,0.2)', 
+                    cursor: 'pointer' 
+                    } 
+                }}
+            >
                 <VideoCallIcon />
+            </IconButton>
+        ),
+        "Download": (
+            <IconButton onClick={handleDownload}>
+                <DownloadIcon />
             </IconButton>
         ),
         "Devices": (
@@ -187,7 +278,7 @@ const Camera = () => {
                     .filter((device: any) => device.kind === "videoinput")
                     .map((device: any) => (
                         <option key={device.deviceId} value={device.deviceId}>{device.label}</option>
-                ))}
+                    ))}
             </select>
         )
     };
@@ -229,6 +320,11 @@ const Camera = () => {
                                 </Stack> */}
                             </Box>
                         </motion.div>
+                        {(problems.length > 0) && (
+                            <Alert severity="warning">
+                                {problems.join(", ")}
+                            </Alert>
+                        )}
                         <BottomNavigation
                             showLabels
                             // value={props.tab}
@@ -239,12 +335,12 @@ const Camera = () => {
                                 .keys(items)
                                 .map((item, index) => (
                                     <BottomNavigationAction
-                                        key={index} 
-                                        label={item} 
+                                        key={index}
+                                        label={item}
                                         icon={(items as any)[item]}
                                         sx={{ color: "#222" }}
                                     />
-                            ))}
+                                ))}
                         </BottomNavigation>
                     </>
                 )) as any}

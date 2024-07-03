@@ -5,11 +5,13 @@ interface CameraStore {
     imageSrc: string | null
     imageClassification: any
     visionMode: string
+    websocketClient: null | any,
     handleView: (view: "launching" | "chat" | "image" | "voice") => void
     handleImageSrc: (imageSrc: string) => void
     handleImageClassification: (imageClassification: any) => void
     toggleVisionMode: (visionMode: "default" | "documents") => void
     setState: (state: CameraStore) => void,
+    setWebsocketClient: (websocketClient: any) => void
 }
 
 
@@ -18,15 +20,29 @@ const useCameraStore = create<CameraStore>((set) => ({
     imageSrc: null,
     imageClassification: null,
     visionMode: 'default',
+    websocketClient: null,
     handleView: (view: "launching" | "chat" | "image" | "voice") => set((state: CameraStore) => ({ ...state, view })),  // String ["launching", "chat", "image", "voice"]
     handleImageSrc: (imageSrc: string) => set(() => ({ imageSrc })), // String Base64 image
     handleImageClassification: (imageClassification: any) => set(() => ({ imageClassification })), // Object {}
     toggleVisionMode: (visionMode: "default" | "documents") => set(() => ({ visionMode })), // String ["Default", "Documents", "Receipts"]
-
+    setWebsocketClient: (websocketClient) => set(() => ({ websocketClient })),
     // master key function
     setState: (state: CameraStore) => set((prevState: CameraStore) => ({ ...prevState, ...state })),
 }));
 
+interface ModelStore {
+    ssd: null | any,
+    blazeface: null | any,
+    setSsd: (ssd: any) => void
+    setBlazeface: (blazeface: any) => void
+}
+
+const useModelStore = create<ModelStore>((set) => ({
+    ssd: null,
+    blazeface: null,
+    setSsd: (ssd: any) => set(() => ({ ssd })),
+    setBlazeface: (blazeface: any) => set(() => ({ blazeface })),
+}));
 
 interface KeycloakStore {
     auth: boolean
@@ -66,6 +82,7 @@ const compareLandmarks = (landmarks1: any, landmarks2: any) => {
 
 export { 
     useCameraStore, 
-    useKeycloakStore, 
+    useKeycloakStore,
+    useModelStore,
     compareLandmarks
 }

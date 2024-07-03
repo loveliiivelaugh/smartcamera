@@ -33,10 +33,10 @@ const client = axios.create({
     headers: {
         "Content-Type": "application/json",
     },
-    auth: {
-        username: import.meta.env.VITE_BASIC_AUTH_USERNAME,
-        password: import.meta.env.VITE_BASIC_AUTH_PASSWORD
-    },
+    // auth: {
+    //     username: import.meta.env.VITE_BASIC_AUTH_USERNAME,
+    //     password: import.meta.env.VITE_BASIC_AUTH_PASSWORD
+    // },
 });
 
 let crossPlatformData: any // temp state 
