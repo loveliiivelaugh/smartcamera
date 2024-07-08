@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Webcam from "react-webcam"
-import { Alert, Box, IconButton } from "@mui/material"
+import { Alert, Box, Divider, IconButton, ListItemText, Stack, Typography } from "@mui/material"
 import { BottomNavigation, BottomNavigationAction } from "@mui/material";
 import { styled } from "@mui/material/styles"
 import CameraIcon from "@mui/icons-material/Camera"
@@ -9,12 +9,20 @@ import VideoCallIcon from "@mui/icons-material/VideoCall"
 import DownloadIcon from "@mui/icons-material/Download";
 import { motion } from "framer-motion"
 
+// Importing the tensorflow.js library 
+import * as tf from "@tensorflow/tfjs"
+// import * as poseDetection from '@tensorflow-models/pose-detection';
+// import * as depthEstimation from '@tensorflow-models/depth-estimation'
 import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import * as blazeface from '@tensorflow-models/blazeface';
+import * as mobilenet from '@tensorflow-models/mobilenet';
 
 import { useCameraStore, useModelStore } from "../store";
 import { client } from "../api";
 
+
+// Calling setBackend() method 
+tf.setBackend('webgl'); 
 
 const WebcamContainer = styled(Box)(() => ({
     display: 'flex',
@@ -30,6 +38,23 @@ const defaultVideoConstraints = {
     facingMode: "environment",
 };
 
+// function getAdjacentKeyPoints(keypoints: any, minConfidence: number) {
+//     const connectedPartIndices = [
+//         [5, 7], [7, 9], [6, 8], [8, 10],
+//         [5, 6], [5, 11], [6, 12], [11, 12],
+//         [11, 13], [13, 15], [12, 14], [14, 16]
+//     ];
+
+//     return connectedPartIndices.filter((indices) => {
+//         return (
+//             keypoints[indices[0]].score >= minConfidence &&
+//             keypoints[indices[1]].score >= minConfidence
+//         );
+//     }).map((indices) => {
+//         return [keypoints[indices[0]], keypoints[indices[1]]];
+//     });
+// };
+
 const Camera = () => {
     const cameraStore = useCameraStore();
     const modelStore = useModelStore();
@@ -38,10 +63,12 @@ const Camera = () => {
     const webcamRef = useRef(null as any);
     const canvasRef = useRef(null as any);
     const videoRef = useRef(null as any);
+    const depthRef = useRef(null as any);
 
-    // const [ssdModel, setSsdModel] = useState(null as any);
-    // const [blazefaceModel, setBlazefaceModel] = useState(null as any);
     const [detectInterval, setDetectInterval] = useState(null as any);
+
+    const [classifiedImage, setClassifiedImage] = useState(null as any);
+    const [facesDetected, ] = useState(null as null | number);
 
     const [availableDevices, setAvailableDevices] = useState([] as any);
     const [problems, setProblems] = useState([] as any);
@@ -72,7 +99,7 @@ const Camera = () => {
                 let type = "video/webm";
                 const blob = new Blob(recordedChunks, { type });
 
-                (window as any).extras.ws.send(blob);
+                // (window as any).extras.ws.send(blob);
 
                 const response = await client.post(
                     '/api/camera/upload', 
@@ -114,6 +141,7 @@ const Camera = () => {
         const imageSrc = webcamRef.current.getScreenshot();
         // // Classify Image // No await -- runs in background and populates redux
         // actions.classifyImage(imageSrc);
+        
         // Save image
         cameraStore.handleImageSrc(imageSrc);
         // Update view
@@ -121,8 +149,10 @@ const Camera = () => {
     }, [webcamRef]);
 
     const detectFaces = async () => {
+
         // Get canvas context
         let canvasContext = canvasRef.current?.getContext('2d');
+
         if (canvasContext) {
             // Set canvas size
             canvasContext.canvas.width = webcamRef.current.props.width;
@@ -130,30 +160,68 @@ const Camera = () => {
             // draw the video first
             canvasContext.drawImage(videoRef.current, 0, 0, 640, 480);
 
-            // console.log(modelStore);
-
             const imageSrc = webcamRef.current.getScreenshot();
             const image = new Image();
             image.height = webcamRef.current.props.height;
             image.width = webcamRef.current.props.width;
             image.src = imageSrc;
 
-            // Facial Recognition
+            // Use the image and the models to determine data ...
+
+            // Image Classification
+            if (modelStore.mobileNet) {
+                const predictions = await modelStore.mobileNet.classify(image);
+                console.log({ predictions });
+                setClassifiedImage(predictions);
+            };
+
+            // // Facial Recognition
+            // if (modelStore.blazeface) {
+            //     const facialRecognition = await modelStore.blazeface.estimateFaces(image);
+
+            //     console.log({ facialRecognition });
+            //     setFacesDetected(facialRecognition.length);
+
+            //     // facialRecognition.forEach((face: any) => {
+            //     //     canvasContext.strokeStyle = 'yellow';
+            //     //     canvasContext.strokeRect(face.box?.[0], face.box?.[1], face.box?.[2], face.box?.[3]);
+            //     // });
+
+
+            //     // Drawing facial recognition results
+            //     facialRecognition.forEach((face: any) => {
+            //         const { topLeft, bottomRight, landmarks } = face;
+
+            //         const x = topLeft[0];
+            //         const y = topLeft[1];
+            //         const width = bottomRight[0] - topLeft[0];
+            //         const height = bottomRight[1] - topLeft[1];
+            //         canvasContext.strokeStyle = 'green';
+            //         canvasContext.strokeRect(x, y, width, height);
+
+            //         landmarks.forEach((landmark: any) => {
+            //             canvasContext.beginPath();
+            //             canvasContext.arc(landmark[0], landmark[1], 2, 0, 2 * Math.PI);
+            //             canvasContext.fillStyle = 'yellow';
+            //             canvasContext.fill();
+            //         });
+            //     });
+            //     // const isMichaelsFace = compareLandmarks(michaelsFacialLandmarks, facialRecognition[0]);
+            //     // if (isMichaelsFace) {
+            //     //     canvasContext = {}
+            //     //     console.log({ detectInterval })
+            //     //     clearInterval(detectInterval);
+            //     //     actions.setIsAuthenticated(true)
+            //     //     // navigate('/')
+            //     // }
+            // };
+
+            // Object Detection
             if (modelStore.ssd) {
-                const ssdModel = modelStore.ssd;
-                const objectDetected = await ssdModel.detect(image);
-                // const facialRecognition = await blazefaceModel.estimateFaces(image);
+                const objectDetected = await modelStore.ssd.detect(image);
 
-                // const isMichaelsFace = compareLandmarks(michaelsFacialLandmarks, facialRecognition[0]);
-                // if (isMichaelsFace) {
-                //     canvasContext = {}
-                //     console.log({ detectInterval })
-                //     clearInterval(detectInterval);
-                //     actions.setIsAuthenticated(true)
-                //     // navigate('/')
-                // }
                 console.log({ objectDetected });
-
+                
                 objectDetected.forEach((detection: any) => {
                     const x = detection.bbox[0];
                     const y = detection.bbox[1];
@@ -167,14 +235,95 @@ const Camera = () => {
                     canvasContext.font = '16px Arial';
                     canvasContext.fillStyle = 'white';
 
-                    if (detection.score.toFixed(2) > 0.8)
-                        canvasContext.fillText(`${detection.class} ${detection.score.toFixed(2)}`, x, y);
-                })
-            } else {
-                let problem = "No Coco SSD model found (Object Detection)";
-                if (problems.includes(problem)) return;
-                else setProblems((problems: any) => [...problems, problem]);
+                    if (detection.score.toFixed(2) > 0.8) canvasContext.fillText(
+                        `${detection.class} ${detection.score.toFixed(2)}`, 
+                        x, 
+                        y
+                    );
+                });
+
             };
+
+            // // Pose Detection
+            // if (modelStore.detector) {
+            //     const poses = await modelStore.detector.estimatePoses(image);
+
+            //     console.log({ poses }); 
+                
+            //     // Drawing pose estimation results
+            //     poses.forEach((pose: any) => {
+            //         pose.keypoints.forEach((keypoint: any) => {
+            //             if (keypoint.score > 0.5) {
+            //                 canvasContext.beginPath();
+            //                 canvasContext.arc(keypoint.x, keypoint.y, 5, 0, 2 * Math.PI);
+            //                 canvasContext.fillStyle = 'blue';
+            //                 canvasContext.fill();
+            //             }
+            //         });
+
+            //         const adjacentKeyPoints = getAdjacentKeyPoints(pose.keypoints, 0.5);
+            //         adjacentKeyPoints.forEach((keypoints: any) => {
+            //             canvasContext.beginPath();
+            //             canvasContext.moveTo(keypoints[0].x, keypoints[0].y);
+            //             canvasContext.lineTo(keypoints[1].x, keypoints[1].y);
+            //             canvasContext.strokeStyle = 'blue';
+            //             canvasContext.lineWidth = 2;
+            //             canvasContext.stroke();
+            //         });
+            //     });
+            // };
+
+            // Depth Estimation
+            if (modelStore.estimator) {
+                // const estimationConfig = {
+                //     minDepth: 0,
+                //     maxDepth: 1,
+                // };
+                
+                // const depthMap = await modelStore.estimator.estimateDepth(image, estimationConfig);
+
+                // console.log({ depthMap });
+
+                // const depthData = await depthMap.toArray();
+
+                // // Drawing depth estimation results
+                // const depthCanvas = depthRef.current;
+                // let depthContext = depthCanvas.getContext('2d');
+                // depthCanvas.width = image.width;
+                // depthCanvas.height = image.height;
+
+                // // const imageData = depthContext.createImageData(image.width, image.height);
+                // // if (depthData?.length) for (let i = 0; i < depthData.length; i++) {
+                // //     const depthValue = depthData[i] * 255;
+                // //     imageData.data[i * 4] = depthValue;
+                // //     imageData.data[i * 4 + 1] = depthValue;
+                // //     imageData.data[i * 4 + 2] = depthValue;
+                // //     imageData.data[i * 4 + 3] = 255;
+                // // }
+
+                // const imageData = depthContext.createImageData(image.width, image.height);
+                // for (let y = 0; y < depthCanvas.height; y++) {
+                //     for (let x = 0; x < depthCanvas.width; x++) {
+                //         const index = y * depthCanvas.width + x;
+                //         const depthValue = depthData[index] * 255;  // Normalize to [0, 255]
+                //         const pixelIndex = index * 4;
+                //         imageData.data[pixelIndex] = depthValue;      // Red
+                //         imageData.data[pixelIndex + 1] = depthValue;  // Green
+                //         imageData.data[pixelIndex + 2] = depthValue;  // Blue
+                //         imageData.data[pixelIndex + 3] = 255;         // Alpha
+                //     }
+                // }
+                // console.log({ imageData });
+                // depthContext.putImageData(imageData, 0, 0);
+                // // canvasContext.drawImage(depthCanvas, 0, 0);
+
+            };
+
+                
+        } else {
+            let problem = "No Coco SSD model found (Object Detection)";
+            if (problems.includes(problem)) return;
+            else setProblems((problems: any) => [...problems, problem]);
         };
     };
 
@@ -186,6 +335,12 @@ const Camera = () => {
     const loadModels = async () => {
         const ssd = await cocoSsd.load();
         const blazefaceModel = await blazeface.load();
+        // const model = poseDetection.SupportedModels.MoveNet;
+        // const detector = await poseDetection.createDetector(model);
+        // const depthEstimationModel = depthEstimation.SupportedModels.ARPortraitDepth;
+        // const estimator = await depthEstimation.createEstimator(depthEstimationModel);
+        const mnet = await mobilenet.load();
+        
         // console.log(
         //     "webcamProps: ",
         //     // await navigator.mediaDevices,
@@ -195,6 +350,10 @@ const Camera = () => {
 
         modelStore.setSsd(ssd);
         modelStore.setBlazeface(blazefaceModel);
+        // modelStore.setPoseDetector(detector);
+        // modelStore.setDepthEstimator(estimator);
+        modelStore.setMobileNet(mnet);
+
 
         const devices = await navigator.mediaDevices.enumerateDevices();
         setAvailableDevices(devices);
@@ -215,9 +374,9 @@ const Camera = () => {
 
     useEffect(() => {
         if (
-            modelStore.ssd && modelStore.blazeface
+            modelStore.ssd && modelStore.blazeface && modelStore.mobileNet
         ) startDetecting();
-    }, [modelStore.ssd, modelStore.blazeface]);
+    }, [modelStore.ssd, modelStore.blazeface, modelStore.mobileNet]);
 
     useEffect(() => {
         // // If the camera is reopened from the image view, ...
@@ -229,13 +388,20 @@ const Camera = () => {
         // console.log('videoEL: ', videoElement);
 
         (async () => {
+            await tf.ready().then(() => { 
+                console.log(JSON.stringify(tf.getBackend())) 
+            });
             const models = await loadModels();
             console.log({ models });
         })();
 
         return () => {
             clearInterval(detectInterval);
-        }
+            // if (mediaStream) mediaStream.getTracks().forEach((track: any) => track.stop());
+            // setMediaStream(null);
+            setClassifiedImage(null);
+
+        };
 
     }, [])
 
@@ -301,23 +467,40 @@ const Camera = () => {
                     <>
                         <motion.div>
                             <Box onDoubleClick={handleDoubleClick} sx={{ height: '100vh', width: '100vw', position: 'absolute', bottom: 0, right: 0, background: 'rgba(0,0,0,0.2)' }}>
+                                <canvas ref={depthRef} style={{ height: '100%', width: '100%', position: 'absolute', bottom: 0, right: 0, zIndex: 1 }} />
                                 <canvas ref={canvasRef} style={{ height: '100%', width: '100%', position: 'absolute', bottom: 0, right: 0, zIndex: 1 }} />
                                 <video ref={videoRef} style={{ height: '100%', width: '100%', position: 'absolute', bottom: 0, right: 0, zIndex: 10 }} />
-                                {/* <Stack sx={{ color: "#fff",mt:10, p: 2, background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', borderRadius: '10px', maxWidth: 250, mx: 2 }}>
+                                <Stack sx={{ color: "#fff",mt:10, p: 2, background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(8px)', borderRadius: '10px', maxWidth: 250, mx: 2 }}>
+                                    <Typography variant="body1">
+                                        Model Status
+                                    </Typography>
                                     {[
-                                        "Image Classification",
-                                        "Object Detection",
-                                        "Image Segmentation",
-                                        "Facial Recognition",
-                                    ].map((item, index) => (
-                                        <FormControlLabel
-                                            control={<Switch checked={true} />}
-                                            onChange={() => {}}
-                                            label={item}
-                                            key={index}
-                                        />
+                                        "ssd",
+                                        "blazeface",
+                                        "detector", // poseDetection
+                                        "estimator",
+                                        "mobileNet",
+                                    ].map((aiModel: string, index: number) => (
+                                        <Typography variant="body1" key={index}>
+                                            {aiModel}: {modelStore[aiModel as keyof typeof modelStore] !== null ? "Loaded" : "Not Loaded"}
+                                        </Typography>
                                     ))}
-                                </Stack> */}
+                                    <Divider />
+                                    {classifiedImage && classifiedImage?.map((item: any, index: number) => (
+                                        <>
+                                            <ListItemText key={index} primary={item.className} />
+                                            <Typography variant="body1">
+                                                {item.probability.toFixed(2) + '% Probability'}
+                                            </Typography>
+                                        </>
+                                    ))}
+                                    <Divider />
+                                    {facesDetected && (
+                                        <Typography variant="body1">
+                                            {facesDetected} Faces Detected
+                                        </Typography>
+                                    )}
+                                </Stack>
                             </Box>
                         </motion.div>
                         {(problems.length > 0) && (

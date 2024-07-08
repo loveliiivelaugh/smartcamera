@@ -1,47 +1,101 @@
 import { create } from 'zustand'
 
 interface CameraStore {
+    appConfig: any
     view: string
+    availableDevices: any
     imageSrc: string | null
     imageClassification: any
+    classifiedImage: any
     visionMode: string
     websocketClient: null | any,
-    handleView: (view: "launching" | "chat" | "image" | "voice") => void
+    videoConstraints: any
+    facesDetected: number | null
+    problems: string[]
+    capturing: boolean
+    detectInterval: any
+    videoChunks: BlobPart[] | undefined
+    setVideoChunks: (videoChunks: any) => void
+    setDetectInterval: (detectInterval: any) => void
+    setCapturing: (capturing: boolean) => void
+    setVideoConstraints: (videoConstraints: any) => void
+    setAvailableDevices: (availableDevices: any) => void
+    setClassifiedImage: (classifiedImage: any) => void
+    setFacesDetected: (facesDetected: number | null) => void
+    handleView: (view: "camera" | "image") => void
     handleImageSrc: (imageSrc: string) => void
     handleImageClassification: (imageClassification: any) => void
     toggleVisionMode: (visionMode: "default" | "documents") => void
     setState: (state: CameraStore) => void,
     setWebsocketClient: (websocketClient: any) => void
-}
+    setAppConfig: (appConfig: any) => void
+    setProblems: (problems: string[]) => void
+};
 
+
+const defaultVideoConstraints = {
+    width: 1280,
+    height: 720,
+    facingMode: "environment",
+};
 
 const useCameraStore = create<CameraStore>((set) => ({
+    appConfig: null,
     view: "camera",
     imageSrc: null,
     imageClassification: null,
+    classifiedImage: null,
+    capturing: false,
     visionMode: 'default',
     websocketClient: null,
-    handleView: (view: "launching" | "chat" | "image" | "voice") => set((state: CameraStore) => ({ ...state, view })),  // String ["launching", "chat", "image", "voice"]
+    facesDetected: null,
+    problems: [],
+    availableDevices: [],
+    videoConstraints: defaultVideoConstraints,
+    videoChunks: undefined,
+    detectInterval: null,
+    setDetectInterval: (detectInterval: any) => set(() => ({ detectInterval })),
+    setProblems: (problems: string[]) => set(() => ({ problems })),
+    setVideoChunks: (videoChunks: any) => set(() => ({ videoChunks })),
+    setVideoConstraints: (videoConstraints: any) => set(() => ({ videoConstraints })),
+    setAvailableDevices: (availableDevices: any) => set(() => ({ availableDevices })),
+    setCapturing: (capturing: boolean) => set(() => ({ capturing })),
+    setFacesDetected: (facesDetected: number | null) => set(() => ({ facesDetected })),
+    setClassifiedImage: (classifiedImage: any) => set(() => ({ classifiedImage })),
+    handleView: (view: "camera" | "image") => set((state: CameraStore) => ({ ...state, view })),  // String ["launching", "chat", "image", "voice"]
     handleImageSrc: (imageSrc: string) => set(() => ({ imageSrc })), // String Base64 image
     handleImageClassification: (imageClassification: any) => set(() => ({ imageClassification })), // Object {}
     toggleVisionMode: (visionMode: "default" | "documents") => set(() => ({ visionMode })), // String ["Default", "Documents", "Receipts"]
     setWebsocketClient: (websocketClient) => set(() => ({ websocketClient })),
+    setAppConfig: (appConfig) => set(() => ({ appConfig })),
     // master key function
     setState: (state: CameraStore) => set((prevState: CameraStore) => ({ ...prevState, ...state })),
 }));
 
 interface ModelStore {
-    ssd: null | any,
-    blazeface: null | any,
+    ssd: null | any, // Object Detection
+    blazeface: null | any, // Facial Recognition
+    detector: null | any, // Pose Detection
+    estimator: null | any, // Depth Estimation
+    mobileNet: null | any, // Image Classification
     setSsd: (ssd: any) => void
-    setBlazeface: (blazeface: any) => void
+    setBlazeface: (blazeface: any) => void,
+    setPoseDetector: (detector: any) => void,
+    setDepthEstimator: (estimator: any) => void,
+    setMobileNet: (mnet: any) => void
 }
 
 const useModelStore = create<ModelStore>((set) => ({
     ssd: null,
     blazeface: null,
+    detector: null, // poseDetection
+    estimator: null,
+    mobileNet: null,
     setSsd: (ssd: any) => set(() => ({ ssd })),
     setBlazeface: (blazeface: any) => set(() => ({ blazeface })),
+    setPoseDetector: (detector: any) => set(() => ({ detector })),
+    setDepthEstimator: (estimator: any) => set(() => ({ estimator })),
+    setMobileNet: (mobileNet: any) => set(() => ({ mobileNet })),
 }));
 
 interface KeycloakStore {

@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { Auth } from '@supabase/auth-ui-react'
-import { ThemeSupa } from '@supabase/auth-ui-shared'
-import { Box } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
 import { create } from 'zustand';
 
-import { client } from '../api';
-// import './index.css'
+import { client, queryPaths } from '../api';
+
 
 const {
     VITE_SUPABASE_URL: supabaseUrl,
@@ -18,12 +16,16 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface SupabaseStoreTypes {
     session: any
+    cpxData: any
     setSession: (session: any) => void
+    setCpxData: (cpxData: any) => void
 }
 
 export const useSupabaseStore = create<SupabaseStoreTypes>((set) => ({
     session: null,
+    cpxData: null,
     setSession: (session: any) => set(() => ({ session })),
+    setCpxData: (cpxData: any) => set(() => ({ cpxData }))
 }))
 
 export function SupabaseAuthProvider({ children }: any) {
@@ -56,6 +58,9 @@ export function SupabaseAuthProvider({ children }: any) {
         } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
             setSession(session)
             supabaseStore.setSession(session)
+            // Set authentication headers
+            const authParams = `userAuthToken=${session?.access_token}&appId=${import.meta.env.VITE_APP_ID}`;
+            (client as any).defaults.headers.common["auth-token"] = authParams;
         })
 
 
@@ -64,6 +69,7 @@ export function SupabaseAuthProvider({ children }: any) {
 
     // console.log({ session })
 
+    
     if (!session) {
         return (
             <Box
@@ -76,13 +82,12 @@ export function SupabaseAuthProvider({ children }: any) {
                     width: "100vw" 
                 }}
             >
-                <Auth 
-                    supabaseClient={supabase} 
-                    appearance={{ theme: ThemeSupa }} 
-                    redirectTo='http://localhost:3000/authenticated'
-                />
+                <Typography variant="h4">No session found</Typography>
+                <Button variant="contained" color="error" onClick={() => window.open(queryPaths.appDepotUrl, "_parent")}>
+                    Back to AppDepot
+                </Button>
             </Box>
         )
     }
-    else return children(session);
+    else return children;
 }
