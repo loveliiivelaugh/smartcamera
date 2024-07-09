@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { v4 as uuidv4 } from 'uuid';
 
-import { useWebsockets } from "../../config/useWs";
+// import { useWebsockets } from "../../config/useWs";
 import { useCameraStore, useModelStore } from "../../store";
 import { client } from "../../api";
 
@@ -10,7 +10,7 @@ const cameraId = uuidv4();
 
 export const useCameraScripts = () => {
 
-    const ws = useWebsockets();
+    // const ws = useWebsockets();
 
     const cameraStore = useCameraStore();
     const modelStore = useModelStore();
@@ -29,7 +29,7 @@ export const useCameraScripts = () => {
             if (event.data.size > 0) {
                 cameraStore.setVideoChunks((prevChunks: any) => [...prevChunks, event.data]);
                 console.log("handleDataAvailable.videoChunks: ", cameraStore.videoChunks)
-                ws.send(JSON.stringify(event.data)); // For websocket streaming | SecurityHub microservice
+                // ws.send(JSON.stringify(event.data)); // For websocket streaming | SecurityHub microservice
             };
         },
 
