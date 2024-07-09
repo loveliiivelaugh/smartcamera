@@ -1,9 +1,9 @@
 import { AppBar, Toolbar, Typography, IconButton, Avatar } from '@mui/material'
 import HomeIcon from '@mui/icons-material/Home';
 
-import Camera from './components/CameraView'
+// import Camera from './components/CameraView'
 import CameraBare from './components/BareCameraView'
-// import AdvancedCamera from './components/AdvancedCamera/AdvancedCamera';
+import AdvancedCamera from './components/AdvancedCamera/AdvancedCamera';
 import ImageView from './components/ImageView'
 import { useCameraStore } from './store'
 import { queryPaths } from './api'
@@ -51,9 +51,9 @@ function App() {
               <Avatar src={"M"} sx={{ width: 40, height: 40 }} />
           </Toolbar>
       </AppBar>
-      {cameraStore.view === "camera" && <Camera />}
+      {/* {cameraStore.view === "camera" && <Camera />} */}
       {cameraStore.view === "recordingCamera" && <CameraBare />}
-      {/* {cameraStore.view === "camera" && <AdvancedCamera />} */}
+      {cameraStore.view === "camera" && <AdvancedCamera />}
       {cameraStore.view === "image" && <ImageView />}
     </>
   )

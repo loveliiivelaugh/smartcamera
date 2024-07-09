@@ -78,10 +78,10 @@ export function SupabaseAuthProvider({ children }: any) {
     };
 
     useEffect(() => {
-        client.get('/auth/v1/protected')
-            .then((response: any) => {
-                console.log("auth/v1/protected: ", response.data)
-            })
+        // client.get('/auth/v1/protected')
+        //     .then((response: any) => {
+        //         console.log("auth/v1/protected: ", response.data)
+        //     })
 
         // Listen for auth state changes
         supabase.auth
